@@ -1,0 +1,25 @@
+# .NET build outputs
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# JetBrains Rider / IntelliJ
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Claude Code: local-only permission overrides (contains absolute paths)
+.claude/settings.local.json

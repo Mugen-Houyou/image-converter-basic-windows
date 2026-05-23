@@ -1,0 +1,60 @@
+<Application xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="ImageConverter.Avalonia.App"
+             RequestedThemeVariant="Light">
+
+    <Application.Resources>
+        <!-- Override Fluent theme accent so Slider/CheckBox/ProgressBar use 9x navy -->
+        <Color x:Key="SystemAccentColor">#000080</Color>
+        <Color x:Key="SystemAccentColorDark1">#000080</Color>
+        <Color x:Key="SystemAccentColorDark2">#000080</Color>
+        <Color x:Key="SystemAccentColorDark3">#000080</Color>
+        <Color x:Key="SystemAccentColorLight1">#000080</Color>
+        <Color x:Key="SystemAccentColorLight2">#000080</Color>
+        <Color x:Key="SystemAccentColorLight3">#000080</Color>
+
+        <!-- 9x style: kill Fluent's TextBox border in all states (external chiseled border in MainWindow) -->
+        <SolidColorBrush x:Key="TextControlBorderBrush" Color="Transparent" />
+        <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="Transparent" />
+        <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="Transparent" />
+        <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="Transparent" />
+
+        <!-- Classic Windows 9x system colors -->
+        <SolidColorBrush x:Key="ClassicButtonFace" Color="#C0C0C0" />
+        <SolidColorBrush x:Key="ClassicButtonShadow" Color="#808080" />
+        <SolidColorBrush x:Key="ClassicButtonHilight" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="ClassicButtonDkShadow" Color="#000000" />
+        <SolidColorBrush x:Key="ClassicWindowBg" Color="#C0C0C0" />
+        <SolidColorBrush x:Key="ClassicControlBg" Color="#C0C0C0" />
+        <SolidColorBrush x:Key="ClassicWindow" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="ClassicWindowFrame" Color="#000000" />
+        <SolidColorBrush x:Key="ClassicGrayText" Color="#808080" />
+        <SolidColorBrush x:Key="ClassicHighlight" Color="#000080" />
+        <SolidColorBrush x:Key="ClassicHighlightText" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="ClassicActiveCaption" Color="#000080" />
+        <SolidColorBrush x:Key="ClassicInactiveCaption" Color="#808080" />
+        <SolidColorBrush x:Key="ClassicDesktop" Color="#008080" />
+    </Application.Resources>
+
+    <Application.Styles>
+        <FluentTheme />
+
+        <!-- Win9x ListBox selection colors -->
+        <!-- Selected but ListBox not focused: gray background, black text -->
+        <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource ClassicButtonFace}" />
+            <Setter Property="Foreground" Value="Black" />
+        </Style>
+        <!-- Selected and ListBox focused: navy background, white text -->
+        <Style Selector="ListBox:focus-within ListBoxItem:selected /template/ ContentPresenter">
+            <Setter Property="Background" Value="{StaticResource ClassicHighlight}" />
+            <Setter Property="Foreground" Value="{StaticResource ClassicHighlightText}" />
+        </Style>
+
+        <!-- 9x style: hide TextBox's own focus/hover accent border (external chiseled border handles it) -->
+        <Style Selector="TextBox /template/ Border#PART_BorderElement">
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+        </Style>
+    </Application.Styles>
+</Application>

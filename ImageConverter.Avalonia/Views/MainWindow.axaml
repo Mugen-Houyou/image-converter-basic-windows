@@ -1,0 +1,158 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:models="clr-namespace:ImageConverter.Core.Models;assembly=ImageConverter.Core"
+        xmlns:conv="clr-namespace:ImageConverter.Avalonia.Converters"
+        x:Class="ImageConverter.Avalonia.Views.MainWindow"
+        Title="이미지 변환기"
+        MinWidth="900" MinHeight="550"
+        Width="960" Height="600"
+        Background="{StaticResource ClassicWindowBg}"
+        WindowStartupLocation="CenterScreen">
+
+    <Window.Resources>
+        <conv:FilePathToBitmapConverter x:Key="PathToImage" />
+    </Window.Resources>
+
+    <Grid Margin="8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Row 0: 상단 버튼 바 -->
+        <Border Grid.Row="0" Padding="4"
+                Background="{StaticResource ClassicButtonFace}" CornerRadius="0">
+            <Grid>
+                <StackPanel Orientation="Horizontal">
+                    <Button Content="파일 추가" Padding="8,4" MinWidth="70" Margin="0,0,6,0"
+                            Command="{Binding AddFilesCommand}" />
+                    <Button Content="변환 시작" Padding="8,4" MinWidth="70" Margin="0,0,6,0"
+                            Command="{Binding StartConversionCommand}" />
+                    <Button Content="목록 지우기" Padding="8,4" MinWidth="70" Margin="0,0,10,0"
+                            Command="{Binding ClearFilesCommand}" />
+                    <Border Background="Transparent"
+                            PointerPressed="WebpArea_PointerPressed">
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Text="{Binding WebpQualityText}" VerticalAlignment="Center"
+                                       Width="110" Margin="6,0,4,0" />
+                            <Slider Value="{Binding WebpQuality}" Minimum="0" Maximum="100"
+                                    Width="100" VerticalAlignment="Center"
+                                    SmallChange="1" LargeChange="10" TickFrequency="1"
+                                    Opacity="{Binding SliderOpacity}" />
+                        </StackPanel>
+                    </Border>
+                    <CheckBox Content="EXIF 제거" IsChecked="{Binding RemoveExif}"
+                              VerticalAlignment="Center" Margin="10,0,0,0" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                    <Button Content="로그 지우기" Padding="8,4" MinWidth="70"
+                            Command="{Binding ClearLogCommand}" />
+                    <Button Content="ℹ" Padding="6,2" MinWidth="30" Margin="6,0,0,0"
+                            FontSize="14" ToolTip.Tip="About"
+                            Click="AboutButton_Click" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Row 1: Etched horizontal separator (Win9x style — shadow over highlight) -->
+        <StackPanel Grid.Row="1" Margin="0,4,0,4">
+            <Border Height="1" Background="{StaticResource ClassicButtonShadow}" />
+            <Border Height="1" Background="{StaticResource ClassicButtonHilight}" />
+        </StackPanel>
+
+        <!-- Row 2: 좌우 패널 -->
+        <Grid Grid.Row="2">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="3*" />
+                <ColumnDefinition Width="4" />
+                <ColumnDefinition Width="4*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- LEFT: ListBox + 안내 문구 -->
+            <Grid Grid.Column="0">
+                <!-- Chiseled inset frame (Win9x sunken border) -->
+                <Border BorderBrush="{StaticResource ClassicButtonShadow}"
+                        BorderThickness="1,1,0,0">
+                <Border BorderBrush="{StaticResource ClassicButtonHilight}"
+                        BorderThickness="0,0,1,1">
+                <ListBox x:Name="FileListBox"
+                         Background="{StaticResource ClassicWindow}"
+                         BorderThickness="0"
+                         ItemsSource="{Binding Files}"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                         DragDrop.AllowDrop="True"
+                         DragDrop.DragEnter="FileList_DragEnter"
+                         DragDrop.Drop="FileList_Drop">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate DataType="models:ImageFileItem">
+                            <StackPanel Orientation="Horizontal" Margin="4,2">
+                                <TextBlock Text="{Binding FileName}" Width="250" VerticalAlignment="Center"
+                                           ToolTip.ShowDelay="300"
+                                           ToolTip.BetweenShowDelay="200">
+                                    <ToolTip.Tip>
+                                        <Image Source="{Binding FilePath, Converter={StaticResource PathToImage}}"
+                                               MaxWidth="240" MaxHeight="240"
+                                               Stretch="Uniform" />
+                                    </ToolTip.Tip>
+                                </TextBlock>
+                                <TextBlock Text="{Binding StatusIcon}" Width="20"
+                                           VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                <TextBlock Text="{Binding StatusText}" Width="80" VerticalAlignment="Center" />
+                                <ProgressBar IsIndeterminate="True" Width="60" Height="14"
+                                             Margin="6,0,0,0"
+                                             IsVisible="{Binding IsProcessing}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                </Border>
+                </Border>
+
+                <!-- 빈 상태 안내 문구 -->
+                <TextBlock x:Name="EmptyHint"
+                           Text="여기에 파일을 끌어다 놓으세요&#x0a;또는 상단의 [파일 추가] 버튼을 클릭하세요"
+                           FontSize="15" Foreground="{StaticResource ClassicGrayText}"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           TextAlignment="Center"
+                           IsVisible="{Binding IsEmpty}"
+                           IsHitTestVisible="False" />
+            </Grid>
+
+            <!-- GridSplitter (Win9x etched groove: shadow left, highlight right) -->
+            <Grid Grid.Column="1">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                    <Border Width="1" Background="{StaticResource ClassicButtonShadow}" />
+                    <Border Width="1" Background="{StaticResource ClassicButtonHilight}" />
+                </StackPanel>
+                <GridSplitter Width="4" HorizontalAlignment="Stretch"
+                              Background="Transparent" />
+            </Grid>
+
+            <!-- RIGHT: 로그 -->
+            <Grid Grid.Column="2">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <TextBlock Grid.Row="0" Text="로그" FontWeight="Bold"
+                           Margin="4,0,0,4" />
+                <!-- Chiseled inset frame (Win9x sunken border) -->
+                <Border Grid.Row="1"
+                        BorderBrush="{StaticResource ClassicButtonShadow}"
+                        BorderThickness="1,1,0,0">
+                    <Border BorderBrush="{StaticResource ClassicButtonHilight}"
+                            BorderThickness="0,0,1,1">
+                        <TextBox Text="{Binding LogText, Mode=OneWay}"
+                                 IsReadOnly="True"
+                                 BorderThickness="0"
+                                 FontFamily="Consolas" FontSize="12"
+                                 TextWrapping="Wrap"
+                                 Background="{StaticResource ClassicButtonHilight}"
+                                 AcceptsReturn="True" />
+                    </Border>
+                </Border>
+            </Grid>
+        </Grid>
+    </Grid>
+</Window>

@@ -1,0 +1,62 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImageConverter.Core", "ImageConverter.Core\ImageConverter.Core.csproj", "{FB652B47-B557-4234-BA1D-59B74306DAA1}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImageConverter.Wpf", "ImageConverter.Wpf\ImageConverter.Wpf.csproj", "{686DFFB4-F16F-45A0-A6B7-6B6E801FA002}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ImageConverter.Avalonia", "ImageConverter.Avalonia\ImageConverter.Avalonia.csproj", "{71468CE2-0A96-4AE1-BFEE-628B416BA1E1}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|Any CPU = Release|Any CPU
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{FB652B47-B557-4234-BA1D-59B74306DAA1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FB652B47-B557-4234-BA1D-59B74306DAA1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FB652B47-B557-4234-BA1D-59B74306DAA1}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{FB652B47-B557-4234-BA1D-59B74306DAA1}.Debug|x64.Build.0 = Debug|Any CPU
+		{FB652B47-B557-4234-BA1D-59B74306DAA1}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{FB652B47-B557-4234-BA1D-59B74306DAA1}.Debug|x86.Build.0 = Debug|Any CPU
+		{FB652B47-B557-4234-BA1D-59B74306DAA1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FB652B47-B557-4234-BA1D-59B74306DAA1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FB652B47-B557-4234-BA1D-59B74306DAA1}.Release|x64.ActiveCfg = Release|Any CPU
+		{FB652B47-B557-4234-BA1D-59B74306DAA1}.Release|x64.Build.0 = Release|Any CPU
+		{FB652B47-B557-4234-BA1D-59B74306DAA1}.Release|x86.ActiveCfg = Release|Any CPU
+		{FB652B47-B557-4234-BA1D-59B74306DAA1}.Release|x86.Build.0 = Release|Any CPU
+		{686DFFB4-F16F-45A0-A6B7-6B6E801FA002}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{686DFFB4-F16F-45A0-A6B7-6B6E801FA002}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{686DFFB4-F16F-45A0-A6B7-6B6E801FA002}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{686DFFB4-F16F-45A0-A6B7-6B6E801FA002}.Debug|x64.Build.0 = Debug|Any CPU
+		{686DFFB4-F16F-45A0-A6B7-6B6E801FA002}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{686DFFB4-F16F-45A0-A6B7-6B6E801FA002}.Debug|x86.Build.0 = Debug|Any CPU
+		{686DFFB4-F16F-45A0-A6B7-6B6E801FA002}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{686DFFB4-F16F-45A0-A6B7-6B6E801FA002}.Release|Any CPU.Build.0 = Release|Any CPU
+		{686DFFB4-F16F-45A0-A6B7-6B6E801FA002}.Release|x64.ActiveCfg = Release|Any CPU
+		{686DFFB4-F16F-45A0-A6B7-6B6E801FA002}.Release|x64.Build.0 = Release|Any CPU
+		{686DFFB4-F16F-45A0-A6B7-6B6E801FA002}.Release|x86.ActiveCfg = Release|Any CPU
+		{686DFFB4-F16F-45A0-A6B7-6B6E801FA002}.Release|x86.Build.0 = Release|Any CPU
+		{71468CE2-0A96-4AE1-BFEE-628B416BA1E1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{71468CE2-0A96-4AE1-BFEE-628B416BA1E1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{71468CE2-0A96-4AE1-BFEE-628B416BA1E1}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{71468CE2-0A96-4AE1-BFEE-628B416BA1E1}.Debug|x64.Build.0 = Debug|Any CPU
+		{71468CE2-0A96-4AE1-BFEE-628B416BA1E1}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{71468CE2-0A96-4AE1-BFEE-628B416BA1E1}.Debug|x86.Build.0 = Debug|Any CPU
+		{71468CE2-0A96-4AE1-BFEE-628B416BA1E1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{71468CE2-0A96-4AE1-BFEE-628B416BA1E1}.Release|Any CPU.Build.0 = Release|Any CPU
+		{71468CE2-0A96-4AE1-BFEE-628B416BA1E1}.Release|x64.ActiveCfg = Release|Any CPU
+		{71468CE2-0A96-4AE1-BFEE-628B416BA1E1}.Release|x64.Build.0 = Release|Any CPU
+		{71468CE2-0A96-4AE1-BFEE-628B416BA1E1}.Release|x86.ActiveCfg = Release|Any CPU
+		{71468CE2-0A96-4AE1-BFEE-628B416BA1E1}.Release|x86.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

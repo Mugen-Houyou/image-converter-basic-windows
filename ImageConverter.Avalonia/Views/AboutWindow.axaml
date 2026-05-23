@@ -1,0 +1,31 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="ImageConverter.Avalonia.Views.AboutWindow"
+        Title="About 이미지 변환기"
+        Width="380" Height="220"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        ShowInTaskbar="False">
+
+    <Grid Margin="20">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TextBlock Grid.Row="0" Text="이미지 변환기" FontSize="18" FontWeight="Bold"
+                   Margin="0,0,0,12" />
+
+        <TextBlock x:Name="CopyrightText" Grid.Row="1" FontSize="13" Margin="0,0,0,4" />
+
+        <TextBlock Grid.Row="2" FontSize="13" Margin="0,0,0,12"
+                   TextWrapping="Wrap"
+                   Text="This project is distributed under the GNU Affero General Public License v3.0 (AGPLv3)." />
+
+        <Button Grid.Row="4" Content="확인" Width="80" HorizontalAlignment="Right"
+                IsCancel="True" Click="Close_Click" />
+    </Grid>
+</Window>
