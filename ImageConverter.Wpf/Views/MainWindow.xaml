@@ -31,11 +31,14 @@
                             Command="{Binding StartConversionCommand}" />
                     <Button Content="목록 지우기" Padding="8,4" MinWidth="70" Margin="0,0,10,0"
                             Command="{Binding ClearFilesCommand}" />
+                    <ComboBox ItemsSource="{Binding OutputFormatNames}"
+                              SelectedItem="{Binding SelectedOutputFormatName}"
+                              VerticalAlignment="Center" Margin="6,0,0,0" />
                     <Border Background="Transparent"
                             MouseRightButtonDown="WebpArea_MouseRightButtonDown">
                         <StackPanel Orientation="Horizontal">
-                            <TextBlock Text="{Binding WebpQualityText}" VerticalAlignment="Center"
-                                       Width="110" Margin="6,0,4,0" />
+                            <TextBlock Text="{Binding QualityText}" VerticalAlignment="Center"
+                                       Width="80" Margin="4,0,4,0" />
                             <Slider Value="{Binding WebpQuality}" Minimum="0" Maximum="100"
                                     Width="100" VerticalAlignment="Center"
                                     SmallChange="1" LargeChange="10"

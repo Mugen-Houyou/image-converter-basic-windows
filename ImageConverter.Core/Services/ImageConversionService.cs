@@ -1,4 +1,6 @@
 using System.IO;
+using ImageMagick;
+using ImageConverter.Core.Models;
 using SkiaSharp;
 
 namespace ImageConverter.Core.Services;
@@ -13,7 +15,9 @@ public static class ImageConversionService
         new[] { ".png", ".jpg", ".jpeg", ".bmp", ".gif" },
         StringComparer.OrdinalIgnoreCase);
 
-    public static Task<(bool success, string error)> ConvertAsync(string filePath, int webpQuality, bool removeExif, CancellationToken ct = default)
+    public static Task<(bool success, string error)> ConvertAsync(
+        string filePath, int quality, bool removeExif,
+        OutputFormat outputFormat, CancellationToken ct = default)
     {
         return Task.Run(() =>
         {
@@ -22,12 +26,24 @@ public static class ImageConversionService
             try
             {
                 var thumbnailOrigin = ReadOrientation(filePath);
-                // Note: When removeExif is false, the WebP output uses TopLeft origin.
-                // SkiaSharp's WebP encoder does not record EXIF orientation, so an image
-                // that was rotated via EXIF may appear un-rotated in the resulting WebP.
-                var webpOrigin = removeExif ? thumbnailOrigin : SKEncodedOrigin.TopLeft;
+                // WebP: 기존 동작 유지 (removeExif=true일 때만 orientation bake)
+                // AVIF: 항상 bake (raw pixel 전달이라 EXIF 기록 불가)
+                var outputOrigin = (outputFormat == OutputFormat.Avif || removeExif)
+                    ? thumbnailOrigin
+                    : SKEncodedOrigin.TopLeft;
+
                 GenerateThumbnail(filePath, thumbnailOrigin);
-                GenerateWebp(filePath, webpQuality, webpOrigin);
+
+                switch (outputFormat)
+                {
+                    case OutputFormat.Avif:
+                        GenerateAvif(filePath, quality, outputOrigin);
+                        break;
+                    default:
+                        GenerateWebp(filePath, quality, outputOrigin);
+                        break;
+                }
+
                 return (true, "");
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
@@ -43,18 +59,24 @@ public static class ImageConversionService
         return SupportedExtensions.Contains(ext);
     }
 
-    public static int CalculateAutoQuality(string filePath)
+    public static int CalculateAutoQuality(string filePath, OutputFormat format)
     {
         using var codec = SKCodec.Create(filePath);
-        if (codec is null) return 90;
+
+        // WebP: HD이하 90, 4K이상 70
+        // AVIF: HD이하 75, 4K이상 50 (AV1의 더 높은 압축 효율 반영)
+        int highQ = format == OutputFormat.Avif ? 75 : 90;
+        int lowQ  = format == OutputFormat.Avif ? 55 : 70;
+
+        if (codec is null) return highQ;
 
         long pixels = (long)codec.Info.Width * codec.Info.Height;
 
-        if (pixels <= HdPixels) return 90;
-        if (pixels >= FourKPixels) return 70;
+        if (pixels <= HdPixels) return highQ;
+        if (pixels >= FourKPixels) return lowQ;
 
         double ratio = (double)(FourKPixels - pixels) / (FourKPixels - HdPixels);
-        return (int)Math.Round(70.0 + 20.0 * ratio);
+        return (int)Math.Round(lowQ + (highQ - lowQ) * ratio);
     }
 
     private static SKEncodedOrigin ReadOrientation(string filePath)
@@ -154,5 +176,31 @@ public static class ImageConversionService
 
         using var stream = File.Create(webpPath);
         data.SaveTo(stream);
+    }
+
+    private static void GenerateAvif(string sourcePath, int quality, SKEncodedOrigin origin)
+    {
+        var avifPath = Path.ChangeExtension(sourcePath, ".avif.jpg");
+        if (File.Exists(avifPath))
+            throw new IOException($"파일이 이미 존재합니다: {Path.GetFileName(avifPath)}");
+
+        using var original = LoadAndOrient(sourcePath, origin);
+
+        // BGRA8888로 정규화 — LoadAndOrient의 반환 ColorType은 플랫폼 의존
+        // CopyTo로 packed BGRA를 보장 (stride padding 제거)
+        using var bgra = new SKBitmap(new SKImageInfo(
+            original.Width, original.Height,
+            SKColorType.Bgra8888, SKAlphaType.Unpremul));
+        original.CopyTo(bgra, SKColorType.Bgra8888);
+
+        var settings = new PixelReadSettings(
+            (uint)bgra.Width, (uint)bgra.Height,
+            StorageType.Char, "BGRA");
+
+        using var image = new MagickImage();
+        image.ReadPixels(bgra.Bytes, settings);
+        image.Format = MagickFormat.Avif;
+        image.Quality = (uint)quality;
+        image.Write(avifPath);
     }
 }

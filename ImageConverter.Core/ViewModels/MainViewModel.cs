@@ -60,7 +60,7 @@ public class MainViewModel : INotifyPropertyChanged
             if (IsWebpQualityAuto)
                 IsWebpQualityAuto = false;  // 내부에서 WebpQualityText, SliderOpacity 갱신됨
             else
-                OnPropertyChanged(nameof(WebpQualityText));
+                OnPropertyChanged(nameof(QualityText));
         }
     }
 
@@ -71,19 +71,39 @@ public class MainViewModel : INotifyPropertyChanged
         {
             _isWebpQualityAuto = value;
             OnPropertyChanged();
-            OnPropertyChanged(nameof(WebpQualityText));
+            OnPropertyChanged(nameof(QualityText));
             OnPropertyChanged(nameof(SliderOpacity));
         }
     }
 
     public double SliderOpacity => IsWebpQualityAuto ? DimmedOpacity : 1.0;
 
-    public string WebpQualityText => IsWebpQualityAuto ? "WEBP 품질: Auto" : $"WEBP 품질: {WebpQuality}";
+    public string QualityText => IsWebpQualityAuto ? "품질: Auto" : $"품질: {WebpQuality}";
+
+    public string[] OutputFormatNames { get; } = { "WEBP", "AVIF" };
+
+    public string SelectedOutputFormatName
+    {
+        get => SelectedOutputFormat == OutputFormat.Avif ? "AVIF" : "WEBP";
+        set
+        {
+            SelectedOutputFormat = value == "AVIF" ? OutputFormat.Avif : OutputFormat.WebP;
+            OnPropertyChanged();
+        }
+    }
 
     public bool RemoveExif
     {
         get => _removeExif;
         set { _removeExif = value; OnPropertyChanged(); }
+    }
+
+    private OutputFormat _selectedOutputFormat = OutputFormat.WebP;
+
+    public OutputFormat SelectedOutputFormat
+    {
+        get => _selectedOutputFormat;
+        set { _selectedOutputFormat = value; OnPropertyChanged(); }
     }
 
     // ── Commands ──
@@ -148,14 +168,15 @@ public class MainViewModel : INotifyPropertyChanged
                 file.Status = ConversionStatus.Processing;
 
                 int quality = IsWebpQualityAuto
-                    ? ImageConversionService.CalculateAutoQuality(file.FilePath)
+                    ? ImageConversionService.CalculateAutoQuality(file.FilePath, SelectedOutputFormat)
                     : WebpQuality;
 
                 AppendLog($"변환 시작: {file.FileName} (퀄리티 {quality})");
 
                 try
                 {
-                    var (success, error) = await ImageConversionService.ConvertAsync(file.FilePath, quality, RemoveExif);
+                    var (success, error) = await ImageConversionService.ConvertAsync(
+                        file.FilePath, quality, RemoveExif, SelectedOutputFormat);
 
                     if (success)
                     {
