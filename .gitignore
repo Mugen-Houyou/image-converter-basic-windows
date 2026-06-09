@@ -1,6 +1,10 @@
 # .NET build outputs
 bin/
 obj/
+publish/
+
+# macOS .app bundle (produced from dotnet publish)
+*.app/
 
 # Visual Studio
 .vs/
