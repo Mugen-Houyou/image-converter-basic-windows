@@ -139,7 +139,7 @@ public static class ImageConversionService
     {
         var thumbPath = Path.ChangeExtension(sourcePath, ".thm.jpg");
         if (File.Exists(thumbPath))
-            throw new IOException($"파일이 이미 존재합니다: {Path.GetFileName(thumbPath)}");
+            return; // 썸네일은 포맷 무관하게 동일 — 이미 있으면 건너뛰기
 
         using var original = LoadAndOrient(sourcePath, origin);
 
