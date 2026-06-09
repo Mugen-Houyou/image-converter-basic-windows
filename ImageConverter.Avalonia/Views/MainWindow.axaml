@@ -149,7 +149,7 @@
                         <TextBox Text="{Binding LogText, Mode=OneWay}"
                                  IsReadOnly="True"
                                  BorderThickness="0"
-                                 FontFamily="Consolas" FontSize="12"
+                                 FontFamily="Consolas, Menlo" FontSize="12"
                                  TextWrapping="Wrap"
                                  Background="{StaticResource ClassicButtonHilight}"
                                  AcceptsReturn="True" />
