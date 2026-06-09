@@ -1,0 +1,9 @@
+{
+  "solution": {
+    "path": "image-converter-basic-windows.sln",
+    "projects": [
+      "ImageConverter.Core\\ImageConverter.Core.csproj",
+      "ImageConverter.Avalonia\\ImageConverter.Avalonia.csproj"
+    ]
+  }
+}
