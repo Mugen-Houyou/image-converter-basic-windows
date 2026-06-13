@@ -149,11 +149,15 @@ public static class ImageConversionService
 
         using var resized = new SKBitmap(ThumbnailSize, ThumbnailSize);
         using (var canvas = new SKCanvas(resized))
+        using (var sourceImage = SKImage.FromBitmap(original))
         {
             var srcRect = new SKRect(cropX, cropY, cropX + minDim, cropY + minDim);
             var dstRect = new SKRect(0, 0, ThumbnailSize, ThumbnailSize);
-            using var paint = new SKPaint();
-            canvas.DrawBitmap(original, srcRect, dstRect, paint);
+            // 대배율 축소(예: 4000px→120px)에서는 nearest/bilinear/bicubic 모두 aliasing이 심하다.
+            // mipmap 트라이리니어만이 출력 픽셀 footprint를 제대로 평균화해 alias 없는 썸네일을 만든다.
+            // (DrawBitmap에는 SKSamplingOptions 오버로드가 없어 SKImage 경유로 DrawImage 사용)
+            var sampling = new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear);
+            canvas.DrawImage(sourceImage, srcRect, dstRect, sampling);
         }
 
         using var image = SKImage.FromBitmap(resized);
