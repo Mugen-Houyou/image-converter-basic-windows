@@ -38,7 +38,7 @@
                             PointerPressed="WebpArea_PointerPressed">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="{Binding QualityText}" VerticalAlignment="Center"
-                                       Width="80" Margin="4,0,4,0" />
+                                       Width="74" TextAlignment="Right" Margin="4,0,6,0" />
                             <Slider Value="{Binding WebpQuality}" Minimum="0" Maximum="100"
                                     Width="100" VerticalAlignment="Center"
                                     SmallChange="1" LargeChange="10" TickFrequency="1"
@@ -47,6 +47,13 @@
                     </Border>
                     <CheckBox Content="EXIF 제거" IsChecked="{Binding RemoveExif}"
                               VerticalAlignment="Center" Margin="10,0,0,0" />
+                    <CheckBox Content="타깃 용량" IsChecked="{Binding IsTargetSizeEnabled}"
+                              VerticalAlignment="Center" Margin="10,0,0,0" />
+                    <TextBox Text="{Binding TargetSizeKb, Mode=TwoWay}" Width="56"
+                             VerticalAlignment="Center" Margin="4,0,2,0"
+                             Opacity="{Binding TargetSizeOpacity}" />
+                    <TextBlock Text="KB" VerticalAlignment="Center"
+                               Opacity="{Binding TargetSizeOpacity}" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
                     <Button Content="로그 지우기" Padding="8,4" MinWidth="70"

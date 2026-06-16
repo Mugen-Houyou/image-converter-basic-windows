@@ -14,6 +14,8 @@ public class MainViewModel : INotifyPropertyChanged
     private int _webpQuality = 90;
     private bool _isWebpQualityAuto = true;
     private bool _removeExif = true;
+    private bool _isTargetSizeEnabled;
+    private int _targetSizeKb = 300;
 
     public MainViewModel()
     {
@@ -98,6 +100,21 @@ public class MainViewModel : INotifyPropertyChanged
         set { _removeExif = value; OnPropertyChanged(); }
     }
 
+    public bool IsTargetSizeEnabled
+    {
+        get => _isTargetSizeEnabled;
+        set { _isTargetSizeEnabled = value; OnPropertyChanged(); OnPropertyChanged(nameof(TargetSizeOpacity)); }
+    }
+
+    public int TargetSizeKb
+    {
+        get => _targetSizeKb;
+        set { _targetSizeKb = value; OnPropertyChanged(); }
+    }
+
+    // 타깃 용량 비활성 시 KB 입력란을 흐리게 (슬라이더 SliderOpacity와 동일 패턴)
+    public double TargetSizeOpacity => IsTargetSizeEnabled ? 1.0 : DimmedOpacity;
+
     private OutputFormat _selectedOutputFormat = OutputFormat.WebP;
 
     public OutputFormat SelectedOutputFormat
@@ -171,18 +188,22 @@ public class MainViewModel : INotifyPropertyChanged
                     ? ImageConversionService.CalculateAutoQuality(file.FilePath, SelectedOutputFormat)
                     : WebpQuality;
 
+                long? targetBytes = IsTargetSizeEnabled ? TargetSizeKb * 1024L : null;
+
                 AppendLog($"변환 시작: {file.FileName} (퀄리티 {quality})");
 
                 try
                 {
-                    var (success, error) = await ImageConversionService.ConvertAsync(
-                        file.FilePath, quality, RemoveExif, SelectedOutputFormat);
+                    var (success, error, note) = await ImageConversionService.ConvertAsync(
+                        file.FilePath, quality, RemoveExif, SelectedOutputFormat, targetBytes);
 
                     if (success)
                     {
                         file.Status = ConversionStatus.Completed;
                         file.StatusText = "완료";
-                        AppendLog($"완료: {file.FileName}");
+                        AppendLog(note.Length > 0
+                            ? $"완료: {file.FileName} ({note})"
+                            : $"완료: {file.FileName}");
                     }
                     else
                     {
