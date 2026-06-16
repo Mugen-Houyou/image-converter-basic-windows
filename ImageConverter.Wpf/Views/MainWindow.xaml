@@ -38,7 +38,7 @@
                             MouseRightButtonDown="WebpArea_MouseRightButtonDown">
                         <StackPanel Orientation="Horizontal">
                             <TextBlock Text="{Binding QualityText}" VerticalAlignment="Center"
-                                       Width="80" Margin="4,0,4,0" />
+                                       Width="64" TextAlignment="Right" Margin="4,0,6,0" />
                             <Slider Value="{Binding WebpQuality}" Minimum="0" Maximum="100"
                                     Width="100" VerticalAlignment="Center"
                                     SmallChange="1" LargeChange="10"
