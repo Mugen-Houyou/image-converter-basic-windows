@@ -192,34 +192,51 @@ public static class ImageConversionService
 
         var best = Encode(full, format, quality);
         int bestW = full.Width, bestH = full.Height;
+        long size0 = best.LongLength;
 
-        // 이미 타깃 이하면 원본 해상도 유지 (업스케일 금지)
-        if (best.LongLength <= target)
+        // full-res가 이미 소프트 허용오차 안이면(예: 322KB vs 타깃 300KB = +7%) 그대로 유지한다.
+        // 업스케일 금지이자 소프트 타깃의 올바른 의미 — 다운스케일하면 해상도만 손해이고,
+        // 가파른 구간에선 오히려 타깃에서 더 멀어진다(실측으로 확인).
+        if (size0 <= target * (1 + TargetTolerance))
             return (best, bestW, bestH);
 
         double minScale = (double)MinTargetDim / Math.Min(full.Width, full.Height);
-        double scale = Math.Sqrt((double)target / best.LongLength);
+
+        // log-log regula falsi(괄호 보간). 타깃을 끼는 두 점 lo·hi 사이를 log-log로 보간한다.
+        // 외삽이 아니라 보간이라 발산하지 않고, 실제 이미지에서 √ 고정점보다 인코딩이 적고 정확하다.
+        // (앞서 시도한 '전역 지수 외삽' log-log는 합성 이미지에서 더 나빠 기각했었음.)
+        double hiS = 1.0, hiF = size0;             // 크기 > 타깃 (상한 괄호)
+        double loS = 0, loF = 0; bool haveLo = false;
+        double scale = Math.Sqrt((double)target / size0);   // 첫 추측
 
         for (int pass = 0; pass < MaxTargetPasses; pass++)
         {
             if (scale < minScale) scale = minScale;
-            if (scale >= 1.0) break;
+            if (scale >= 1.0) scale = hiS * 0.99;
 
             using var resized = ResizeBitmap(full, scale);
             var bytes = Encode(resized, format, quality);
+            long size = bytes.LongLength;
 
-            // 타깃에 더 가까우면 채택
-            if (Math.Abs(bytes.LongLength - target) < Math.Abs(best.LongLength - target))
+            // 타깃에 더 가까우면 채택 (full-res도 best 후보로 이미 들어가 있음)
+            if (Math.Abs(size - target) < Math.Abs(best.LongLength - target))
             {
                 best = bytes; bestW = resized.Width; bestH = resized.Height;
             }
 
-            double err = (double)(bytes.LongLength - target) / target;
-            if (Math.Abs(err) <= TargetTolerance) break;            // 부근이면 종료
-            if (scale <= minScale) break;                           // floor 도달, 더 못 줄임
-            // 국소 고정점 보정. log-log 전역 지수 추정도 시도했으나 실측상 더 낫지 않아(곡선이
-            // 깨끗한 거듭제곱이 아님) 단순·견고한 이 방식을 유지. scale *= √(타깃/실제크기).
-            scale *= Math.Sqrt((double)target / bytes.LongLength);
+            if (Math.Abs((double)(size - target) / target) <= TargetTolerance) break; // 부근이면 종료
+            if (scale <= minScale) break;                                             // floor 도달
+
+            if (size < target) { loS = scale; loF = size; haveLo = true; }  // 하한 괄호
+            else { hiS = scale; hiF = size; }                               // 상한 괄호
+
+            if (!haveLo) { scale *= 0.6; continue; }   // 하한 괄호를 아직 못 잡았으면 더 줄여 탐색
+
+            // 거짓위치법(log-log): (loS,loF)·(hiS,hiF) 사이를 보간해 다음 scale 예측
+            double ls = Math.Log(loS) + (Math.Log(target) - Math.Log(loF)) *
+                        (Math.Log(hiS) - Math.Log(loS)) / (Math.Log(hiF) - Math.Log(loF));
+            scale = Math.Exp(ls);
+            if (scale <= loS || scale >= hiS) scale = (loS + hiS) / 2;   // 괄호 밖이면 이분법 보정
         }
 
         return (best, bestW, bestH);
