@@ -15,9 +15,9 @@ public static class ImageConversionService
         new[] { ".png", ".jpg", ".jpeg", ".bmp", ".gif" },
         StringComparer.OrdinalIgnoreCase);
 
-    public static Task<(bool success, string error)> ConvertAsync(
+    public static Task<(bool success, string error, string note)> ConvertAsync(
         string filePath, int quality, bool removeExif,
-        OutputFormat outputFormat, CancellationToken ct = default)
+        OutputFormat outputFormat, long? targetSizeBytes = null, CancellationToken ct = default)
     {
         return Task.Run(() =>
         {
@@ -34,21 +34,13 @@ public static class ImageConversionService
 
                 GenerateThumbnail(filePath, thumbnailOrigin);
 
-                switch (outputFormat)
-                {
-                    case OutputFormat.Avif:
-                        GenerateAvif(filePath, quality, outputOrigin);
-                        break;
-                    default:
-                        GenerateWebp(filePath, quality, outputOrigin);
-                        break;
-                }
+                var note = GenerateOutput(filePath, quality, outputFormat, outputOrigin, targetSizeBytes);
 
-                return (true, "");
+                return (true, "", note);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                return (false, ex.Message);
+                return (false, ex.Message, "");
             }
         }, ct);
     }
@@ -167,44 +159,111 @@ public static class ImageConversionService
         data.SaveTo(stream);
     }
 
-    private static void GenerateWebp(string sourcePath, int quality, SKEncodedOrigin origin)
+    // ── 출력 생성 (타깃 용량 탐색 포함) ──
+
+    private const int MinTargetDim = 200;        // 타깃 탐색 시 짧은 변 최소 px
+    private const int MaxTargetPasses = 3;        // 인코딩 반복 상한
+    private const double TargetTolerance = 0.12;  // ±12% 이내면 보정 중단 (소프트 타깃)
+
+    private static string GenerateOutput(
+        string sourcePath, int quality, OutputFormat format,
+        SKEncodedOrigin origin, long? targetSizeBytes)
     {
-        var webpPath = Path.ChangeExtension(sourcePath, ".webp.jpg");
-        if (File.Exists(webpPath))
-            throw new IOException($"파일이 이미 존재합니다: {Path.GetFileName(webpPath)}");
+        var ext = format == OutputFormat.Avif ? ".avif.jpg" : ".webp.jpg";
+        var outPath = Path.ChangeExtension(sourcePath, ext);
+        if (File.Exists(outPath))
+            throw new IOException($"파일이 이미 존재합니다: {Path.GetFileName(outPath)}");
 
         using var original = LoadAndOrient(sourcePath, origin);
+        var (bytes, width, height) = EncodeToTarget(original, format, quality, targetSizeBytes);
+        File.WriteAllBytes(outPath, bytes);
 
-        using var image = SKImage.FromBitmap(original);
-        using var data = image.Encode(SKEncodedImageFormat.Webp, quality);
-
-        using var stream = File.Create(webpPath);
-        data.SaveTo(stream);
+        // 타깃 모드일 때만 결과 해상도/용량 요약을 반환 (로그 표시용)
+        return targetSizeBytes is null ? "" : $"{width}×{height}, {FormatKb(bytes.LongLength)}";
     }
 
-    private static void GenerateAvif(string sourcePath, int quality, SKEncodedOrigin origin)
+    // 파일 크기는 해상도로부터 해석적으로 계산 불가 → 인코딩→측정→스케일 보정으로 근접시킨다.
+    // 퀄리티는 고정하고 해상도만 조정한다. 업스케일은 하지 않으며, 타깃은 소프트(부근이면 OK).
+    private static (byte[] bytes, int width, int height) EncodeToTarget(
+        SKBitmap full, OutputFormat format, int quality, long? targetSizeBytes)
     {
-        var avifPath = Path.ChangeExtension(sourcePath, ".avif.jpg");
-        if (File.Exists(avifPath))
-            throw new IOException($"파일이 이미 존재합니다: {Path.GetFileName(avifPath)}");
+        if (targetSizeBytes is not long target)
+            return (Encode(full, format, quality), full.Width, full.Height);
 
-        using var original = LoadAndOrient(sourcePath, origin);
+        var best = Encode(full, format, quality);
+        int bestW = full.Width, bestH = full.Height;
 
-        // BGRA8888로 정규화 — LoadAndOrient의 반환 ColorType은 플랫폼 의존
-        // CopyTo로 packed BGRA를 보장 (stride padding 제거)
+        // 이미 타깃 이하면 원본 해상도 유지 (업스케일 금지)
+        if (best.LongLength <= target)
+            return (best, bestW, bestH);
+
+        double minScale = (double)MinTargetDim / Math.Min(full.Width, full.Height);
+        double scale = Math.Sqrt((double)target / best.LongLength);
+
+        for (int pass = 0; pass < MaxTargetPasses; pass++)
+        {
+            if (scale < minScale) scale = minScale;
+            if (scale >= 1.0) break;
+
+            using var resized = ResizeBitmap(full, scale);
+            var bytes = Encode(resized, format, quality);
+
+            // 타깃에 더 가까우면 채택
+            if (Math.Abs(bytes.LongLength - target) < Math.Abs(best.LongLength - target))
+            {
+                best = bytes; bestW = resized.Width; bestH = resized.Height;
+            }
+
+            double err = (double)(bytes.LongLength - target) / target;
+            if (Math.Abs(err) <= TargetTolerance) break;            // 부근이면 종료
+            if (scale <= minScale) break;                           // floor 도달, 더 못 줄임
+            scale *= Math.Sqrt((double)target / bytes.LongLength);  // 예측 보정
+        }
+
+        return (best, bestW, bestH);
+    }
+
+    private static byte[] Encode(SKBitmap bmp, OutputFormat format, int quality) =>
+        format == OutputFormat.Avif ? EncodeAvif(bmp, quality) : EncodeWebp(bmp, quality);
+
+    private static byte[] EncodeWebp(SKBitmap bmp, int quality)
+    {
+        using var image = SKImage.FromBitmap(bmp);
+        using var data = image.Encode(SKEncodedImageFormat.Webp, quality);
+        return data.ToArray();
+    }
+
+    private static byte[] EncodeAvif(SKBitmap bmp, int quality)
+    {
+        // BGRA8888로 정규화 — ColorType은 플랫폼 의존, CopyTo로 packed BGRA 보장 (stride padding 제거)
         using var bgra = new SKBitmap(new SKImageInfo(
-            original.Width, original.Height,
-            SKColorType.Bgra8888, SKAlphaType.Unpremul));
-        original.CopyTo(bgra, SKColorType.Bgra8888);
+            bmp.Width, bmp.Height, SKColorType.Bgra8888, SKAlphaType.Unpremul));
+        bmp.CopyTo(bgra, SKColorType.Bgra8888);
 
         var settings = new PixelReadSettings(
-            (uint)bgra.Width, (uint)bgra.Height,
-            StorageType.Char, "BGRA");
+            (uint)bgra.Width, (uint)bgra.Height, StorageType.Char, "BGRA");
 
         using var image = new MagickImage();
         image.ReadPixels(bgra.Bytes, settings);
         image.Format = MagickFormat.Avif;
         image.Quality = (uint)quality;
-        image.Write(avifPath);
+        return image.ToByteArray();
     }
+
+    private static SKBitmap ResizeBitmap(SKBitmap src, double scale)
+    {
+        int w = Math.Max(1, (int)Math.Round(src.Width * scale));
+        int h = Math.Max(1, (int)Math.Round(src.Height * scale));
+
+        var dst = new SKBitmap(new SKImageInfo(w, h, src.ColorType, src.AlphaType));
+        using var canvas = new SKCanvas(dst);
+        using var image = SKImage.FromBitmap(src);
+        // 썸네일과 동일한 mipmap 트라이리니어로 alias 없는 다운스케일
+        var sampling = new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear);
+        canvas.DrawImage(image, new SKRect(0, 0, src.Width, src.Height),
+                                new SKRect(0, 0, w, h), sampling);
+        return dst;
+    }
+
+    private static string FormatKb(long bytes) => $"{bytes / 1024.0:F0}KB";
 }
