@@ -217,7 +217,9 @@ public static class ImageConversionService
             double err = (double)(bytes.LongLength - target) / target;
             if (Math.Abs(err) <= TargetTolerance) break;            // 부근이면 종료
             if (scale <= minScale) break;                           // floor 도달, 더 못 줄임
-            scale *= Math.Sqrt((double)target / bytes.LongLength);  // 예측 보정
+            // 국소 고정점 보정. log-log 전역 지수 추정도 시도했으나 실측상 더 낫지 않아(곡선이
+            // 깨끗한 거듭제곱이 아님) 단순·견고한 이 방식을 유지. scale *= √(타깃/실제크기).
+            scale *= Math.Sqrt((double)target / bytes.LongLength);
         }
 
         return (best, bestW, bestH);
