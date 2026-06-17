@@ -52,17 +52,35 @@ public partial class MainWindow : Window
         }
     }
 
-    private void FileList_DragEnter(object? sender, DragEventArgs e)
+    private void FileList_DragEnter(object? sender, DragEventArgs e) => UpdateDragFeedback(e);
+
+    private void FileList_DragOver(object? sender, DragEventArgs e) => UpdateDragFeedback(e);
+
+    // Win9x target feedback: highlight the drop zone with the system selection color
+    // (navy #000080) while a valid file drag hovers. DragOver re-asserts on every move so
+    // entering/leaving child list items can't flicker the highlight off.
+    private void UpdateDragFeedback(DragEventArgs e)
     {
         if (e.Data.Contains(DataFormats.Files))
         {
             e.DragEffects = DragDropEffects.Copy;
+            DropHighlight.IsVisible = true;
             e.Handled = true;
         }
+        else
+        {
+            e.DragEffects = DragDropEffects.None;
+        }
+    }
+
+    private void FileList_DragLeave(object? sender, DragEventArgs e)
+    {
+        DropHighlight.IsVisible = false;
     }
 
     private void FileList_Drop(object? sender, DragEventArgs e)
     {
+        DropHighlight.IsVisible = false;
         var files = e.Data.GetFiles();
         if (files != null && DataContext is MainViewModel vm)
         {

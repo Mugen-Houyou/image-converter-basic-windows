@@ -93,6 +93,8 @@
                          ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          DragDrop.AllowDrop="True"
                          DragDrop.DragEnter="FileList_DragEnter"
+                         DragDrop.DragOver="FileList_DragOver"
+                         DragDrop.DragLeave="FileList_DragLeave"
                          DragDrop.Drop="FileList_Drop">
                     <ListBox.ItemTemplate>
                         <DataTemplate DataType="models:ImageFileItem">
@@ -118,6 +120,13 @@
                 </ListBox>
                 </Border>
                 </Border>
+
+                <!-- Drag-over highlight: navy frame replaces the chiseled border while a valid file drag hovers -->
+                <Border x:Name="DropHighlight"
+                        BorderBrush="{StaticResource ClassicHighlight}"
+                        BorderThickness="2"
+                        IsVisible="False"
+                        IsHitTestVisible="False" />
 
                 <!-- 빈 상태 안내 문구 -->
                 <TextBlock x:Name="EmptyHint"
