@@ -81,6 +81,8 @@
                           ItemsSource="{Binding Files}"
                           AllowDrop="True"
                           DragEnter="FileListView_DragEnter"
+                          DragOver="FileListView_DragOver"
+                          DragLeave="FileListView_DragLeave"
                           Drop="FileListView_Drop"
                           ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                           SelectionMode="Single">
@@ -118,6 +120,13 @@
                         </GridView>
                     </ListView.View>
                 </ListView>
+
+                <!-- Drag-over highlight: system selection color border while a valid file drag hovers -->
+                <Border x:Name="DropHighlight"
+                        BorderBrush="{DynamicResource {x:Static SystemColors.HighlightBrushKey}}"
+                        BorderThickness="1"
+                        Visibility="Collapsed"
+                        IsHitTestVisible="False" />
 
                 <!-- 빈 상태 안내 문구 -->
                 <TextBlock x:Name="EmptyHint"

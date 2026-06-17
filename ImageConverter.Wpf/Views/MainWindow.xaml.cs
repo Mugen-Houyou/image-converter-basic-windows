@@ -36,17 +36,29 @@ public partial class MainWindow : Window
         }
     }
 
-    private void FileListView_DragEnter(object sender, DragEventArgs e)
+    private void FileListView_DragEnter(object sender, DragEventArgs e) => UpdateDragFeedback(e);
+
+    private void FileListView_DragOver(object sender, DragEventArgs e) => UpdateDragFeedback(e);
+
+    // Highlight the drop zone with the system selection color while a valid file drag hovers.
+    // DragOver re-asserts on every move so entering/leaving child list items can't flicker it off.
+    private void UpdateDragFeedback(DragEventArgs e)
     {
         if (e.Data.GetDataPresent(DataFormats.FileDrop))
         {
             e.Effects = DragDropEffects.Copy;
+            DropHighlight.Visibility = Visibility.Visible;
             e.Handled = true;
         }
         else
         {
             e.Effects = DragDropEffects.None;
         }
+    }
+
+    private void FileListView_DragLeave(object sender, DragEventArgs e)
+    {
+        DropHighlight.Visibility = Visibility.Collapsed;
     }
 
     private void AboutButton_Click(object sender, RoutedEventArgs e)
@@ -66,6 +78,7 @@ public partial class MainWindow : Window
 
     private void FileListView_Drop(object sender, DragEventArgs e)
     {
+        DropHighlight.Visibility = Visibility.Collapsed;
         if (e.Data.GetDataPresent(DataFormats.FileDrop) && DataContext is MainViewModel vm)
         {
             var files = (string[])e.Data.GetData(DataFormats.FileDrop);
