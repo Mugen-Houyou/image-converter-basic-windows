@@ -32,11 +32,12 @@ public static class ImageConversionService
                     ? thumbnailOrigin
                     : SKEncodedOrigin.TopLeft;
 
-                GenerateThumbnail(filePath, thumbnailOrigin);
+                var thumbNote = GenerateThumbnail(filePath, thumbnailOrigin);
 
                 var note = GenerateOutput(filePath, quality, outputFormat, outputOrigin, targetSizeBytes);
 
-                return (true, "", note);
+                var formatLabel = outputFormat == OutputFormat.Avif ? "avif" : "webp";
+                return (true, "", $"{formatLabel} {note} / thm {thumbNote}");
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -132,11 +133,19 @@ public static class ImageConversionService
         return result;
     }
 
-    private static void GenerateThumbnail(string sourcePath, SKEncodedOrigin origin)
+    // 썸네일 생성 후 해상도/용량 요약을 반환 (로그 표시용)
+    private static string GenerateThumbnail(string sourcePath, SKEncodedOrigin origin)
     {
         var thumbPath = Path.ChangeExtension(sourcePath, ".thm.jpg");
         if (File.Exists(thumbPath))
-            return; // 썸네일은 포맷 무관하게 동일 — 이미 있으면 건너뛰기
+        {
+            // 썸네일은 포맷 무관하게 동일 — 이미 있으면 재생성 없이 기존 파일 정보만 보고
+            using var codec = SKCodec.Create(thumbPath);
+            var dims = codec is null
+                ? $"{ThumbnailSize}×{ThumbnailSize}"
+                : $"{codec.Info.Width}×{codec.Info.Height}";
+            return $"{dims}, {FormatKb(new FileInfo(thumbPath).Length)} (기존)";
+        }
 
         using var original = LoadAndOrient(sourcePath, origin);
 
@@ -162,6 +171,8 @@ public static class ImageConversionService
 
         using var stream = File.Create(thumbPath);
         data.SaveTo(stream);
+
+        return $"{resized.Width}×{resized.Height}, {FormatKb(data.Size)}";
     }
 
     // ── 출력 생성 (타깃 용량 탐색 포함) ──
@@ -183,8 +194,8 @@ public static class ImageConversionService
         var (bytes, width, height) = EncodeToTarget(original, format, quality, targetSizeBytes);
         File.WriteAllBytes(outPath, bytes);
 
-        // 타깃 모드일 때만 결과 해상도/용량 요약을 반환 (로그 표시용)
-        return targetSizeBytes is null ? "" : $"{width}×{height}, {FormatKb(bytes.LongLength)}";
+        // 결과 해상도/용량 요약을 반환 (로그 표시용)
+        return $"{width}×{height}, {FormatKb(bytes.LongLength)}";
     }
 
     // 파일 크기는 해상도로부터 해석적으로 계산 불가 → 인코딩→측정→스케일 보정으로 근접시킨다.
