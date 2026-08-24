@@ -56,7 +56,7 @@ public static class ImageConversionService
         using var codec = SKCodec.Create(filePath);
 
         // WebP: HD이하 90, 4K이상 70
-        // AVIF: HD이하 75, 4K이상 50 (AV1의 더 높은 압축 효율 반영)
+        // AVIF: HD이하 75, 4K이상 55 (AV1의 더 높은 압축 효율 반영해 전 구간 15씩 낮게)
         int highQ = format == OutputFormat.Avif ? 75 : 90;
         int lowQ  = format == OutputFormat.Avif ? 55 : 70;
 
@@ -67,7 +67,12 @@ public static class ImageConversionService
         if (pixels <= HdPixels) return highQ;
         if (pixels >= FourKPixels) return lowQ;
 
-        double ratio = (double)(FourKPixels - pixels) / (FourKPixels - HdPixels);
+        // 픽셀 수에 선형 보간하면 HD 바로 위가 너무 완만했다(2560×1440에서 85).
+        // 해상도는 배수로 커지는 양이므로 log 스케일로 보간한다. HD~4K가 정확히 4배
+        // (2배씩 두 번)이고 두 포맷 모두 구간 폭이 20이라, 결과는 "픽셀 수가 2배가
+        // 될 때마다 퀄리티 10 하락"이 된다. 끝점(90/70, 75/55)은 그대로 유지된다.
+        double ratio = Math.Log((double)FourKPixels / pixels)
+                     / Math.Log((double)FourKPixels / HdPixels);
         return (int)Math.Round(lowQ + (highQ - lowQ) * ratio);
     }
 
