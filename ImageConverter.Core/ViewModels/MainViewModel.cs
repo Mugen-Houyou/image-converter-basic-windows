@@ -12,6 +12,7 @@ public class MainViewModel : INotifyPropertyChanged
     private string _logText = string.Empty;
     private bool _isProcessing;
     private int _webpQuality = 90;
+    private double _qualitySliderPosition = QualityCurve.QualityToPosition(90);
     private bool _isWebpQualityAuto = true;
     private bool _removeExif = true;
     private bool _isTargetSizeEnabled;
@@ -50,21 +51,34 @@ public class MainViewModel : INotifyPropertyChanged
 
     private const double DimmedOpacity = 0.4;
 
-    public int WebpQuality
+    // 슬라이더가 바인딩하는 물리적 위치(0~100, 선형). 위치→퀄리티는 QualityCurve가 매핑.
+    public double QualitySliderPosition
     {
-        get => _webpQuality;
+        get => _qualitySliderPosition;
         set
         {
-            if (_webpQuality == value) return;
-            _webpQuality = value;
+            if (_qualitySliderPosition == value) return;
+            _qualitySliderPosition = value;
             OnPropertyChanged();
+
+            int newQuality = QualityCurve.PositionToQuality(value);
+            bool qualityChanged = _webpQuality != newQuality;
+            if (qualityChanged)
+            {
+                _webpQuality = newQuality;
+                OnPropertyChanged(nameof(WebpQuality));
+            }
+
             // 유저가 슬라이더를 만지면(=Value 변경) 자동으로 수동 모드로 전환
             if (IsWebpQualityAuto)
-                IsWebpQualityAuto = false;  // 내부에서 WebpQualityText, SliderOpacity 갱신됨
-            else
+                IsWebpQualityAuto = false;  // 내부에서 QualityText, SliderOpacity 갱신됨
+            else if (qualityChanged)
                 OnPropertyChanged(nameof(QualityText));
         }
     }
+
+    // 매핑된 실제 인코더 퀄리티(읽기 전용). 변환·QualityText에서 사용.
+    public int WebpQuality => _webpQuality;
 
     public bool IsWebpQualityAuto
     {
