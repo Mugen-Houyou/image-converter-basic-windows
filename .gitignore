@@ -27,3 +27,8 @@ desktop.ini
 
 # Claude Code: local-only permission overrides (contains absolute paths)
 .claude/settings.local.json
+
+# Image converter outputs written next to the input image (thumbnail + converted)
+*.thm.jpg
+*.webp.jpg
+*.avif.jpg
