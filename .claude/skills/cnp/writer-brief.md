@@ -70,6 +70,19 @@ part only when there is truly nothing to say:
 - NO trailer lines (Co-Authored-By etc.) — the main agent adds them.
 - Detailed is good; padded is not. Every sentence should tell the
   reader something they could not get from the diff.
+- Every factual claim must be traceable to the staged diff or to the
+  INTENT SUMMARY. If neither supports it, leave it out — do not infer
+  runtime behaviour, configuration, or verification you cannot see.
+  An independent verifier checks each claim against exactly these two
+  sources and sends BLOCKING findings back to you.
+
+## Revision round
+
+If you receive verifier findings after your draft, fix exactly what is
+flagged, keep everything else as it was, and output the complete
+message again in the format below. Do not argue with a finding: if you
+think it is wrong, still apply the most conservative fix (drop or
+soften the claim).
 
 ## Output format — exactly this, nothing else
 
