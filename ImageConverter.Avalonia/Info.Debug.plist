@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- Debug variant of Info.plist. Only three keys differ from the release plist:
+     a distinct CFBundleIdentifier (…​.debug) plus "(Debug)" names, so macOS
+     treats this as a separate app and the Debug bundle can run at the SAME time
+     as the installed Release build instead of just re-activating it.
+     Keep the other keys in sync with Info.plist by hand (e.g. version bumps). -->
+<plist version="1.0">
+<dict>
+    <key>CFBundleIdentifier</key>
+    <string>com.seanergyp.imageconverter.debug</string>
+    <key>CFBundleName</key>
+    <string>Image Converter (Debug)</string>
+    <key>CFBundleDisplayName</key>
+    <string>이미지 변환기 (Debug)</string>
+    <key>CFBundleVersion</key>
+    <string>1.0.0</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleExecutable</key>
+    <string>ImageConverter.Avalonia</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>LSMinimumSystemVersion</key>
+    <string>12.0</string>
+</dict>
+</plist>
