@@ -198,18 +198,25 @@ public class MainViewModel : INotifyPropertyChanged
             {
                 file.Status = ConversionStatus.Processing;
 
-                int quality = IsWebpQualityAuto
-                    ? ImageConversionService.CalculateAutoQuality(file.FilePath, SelectedOutputFormat)
-                    : WebpQuality;
-
                 long? targetBytes = IsTargetSizeEnabled ? TargetSizeKb * 1024L : null;
-
-                AppendLog($"변환 시작: {file.FileName} (퀄리티 {quality})");
 
                 try
                 {
+                    // 원본은 여기서 한 번만 읽는다. 퀄리티 계산·썸네일·출력·용량 비교가 모두 이 사본을 쓰므로
+                    // 변환 도중 원본이 옮겨지거나 지워져도 끝까지 진행된다.
+                    var source = await File.ReadAllBytesAsync(file.FilePath);
+
+                    bool isAuto = IsWebpQualityAuto;
+                    int quality = isAuto
+                        ? ImageConversionService.CalculateAutoQuality(source, SelectedOutputFormat)
+                        : WebpQuality;
+
+                    AppendLog($"변환 시작: {file.FileName} (퀄리티 {quality})");
+
+                    // 원본보다 커지면 퀄리티를 낮춰 재시도하는 건 Auto일 때만 — 수동 퀄리티는 사용자 선택을 존중
                     var (success, error, note) = await ImageConversionService.ConvertAsync(
-                        file.FilePath, quality, RemoveExif, SelectedOutputFormat, targetBytes);
+                        file.FilePath, source, quality, shrinkIfLarger: isAuto,
+                        RemoveExif, SelectedOutputFormat, targetBytes);
 
                     if (success)
                     {

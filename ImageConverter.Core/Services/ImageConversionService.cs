@@ -15,8 +15,11 @@ public static class ImageConversionService
         new[] { ".png", ".jpg", ".jpeg", ".bmp", ".gif" },
         StringComparer.OrdinalIgnoreCase);
 
+    // source: 변환 시작 시 한 번 읽어 둔 원본 바이트. 이후 원본 파일은 다시 열지 않으므로
+    //         변환 도중 원본이 옮겨지거나 지워져도 끝까지 진행된다. filePath는 출력 경로 계산에만 쓴다.
+    // shrinkIfLarger: 결과가 원본보다 크면 퀄리티를 낮춰 재인코딩 (Auto 퀄리티일 때만 켠다)
     public static Task<(bool success, string error, string note)> ConvertAsync(
-        string filePath, int quality, bool removeExif,
+        string filePath, byte[] source, int quality, bool shrinkIfLarger, bool removeExif,
         OutputFormat outputFormat, long? targetSizeBytes = null, CancellationToken ct = default)
     {
         return Task.Run(() =>
@@ -25,16 +28,17 @@ public static class ImageConversionService
 
             try
             {
-                var thumbnailOrigin = ReadOrientation(filePath);
+                var thumbnailOrigin = ReadOrientation(source);
                 // WebP: 기존 동작 유지 (removeExif=true일 때만 orientation bake)
                 // AVIF: 항상 bake (raw pixel 전달이라 EXIF 기록 불가)
                 var outputOrigin = (outputFormat == OutputFormat.Avif || removeExif)
                     ? thumbnailOrigin
                     : SKEncodedOrigin.TopLeft;
 
-                var thumbNote = GenerateThumbnail(filePath, thumbnailOrigin);
+                var thumbNote = GenerateThumbnail(filePath, source, thumbnailOrigin);
 
-                var note = GenerateOutput(filePath, quality, outputFormat, outputOrigin, targetSizeBytes);
+                var note = GenerateOutput(filePath, source, quality, shrinkIfLarger,
+                                          outputFormat, outputOrigin, targetSizeBytes);
 
                 var formatLabel = outputFormat == OutputFormat.Avif ? "avif" : "webp";
                 return (true, "", $"{formatLabel} {note} / thm {thumbNote}");
@@ -52,9 +56,9 @@ public static class ImageConversionService
         return SupportedExtensions.Contains(ext);
     }
 
-    public static int CalculateAutoQuality(string filePath, OutputFormat format)
+    public static int CalculateAutoQuality(byte[] source, OutputFormat format)
     {
-        using var codec = SKCodec.Create(filePath);
+        using var codec = CreateCodec(source);
 
         // WebP: HD이하 90, 4K이상 70
         // AVIF: HD이하 75, 4K이상 55 (AV1의 더 높은 압축 효율 반영해 전 구간 15씩 낮게)
@@ -77,15 +81,22 @@ public static class ImageConversionService
         return (int)Math.Round(lowQ + (highQ - lowQ) * ratio);
     }
 
-    private static SKEncodedOrigin ReadOrientation(string filePath)
+    // 메모리에 읽어 둔 원본에서 코덱 생성 (원본 파일은 다시 열지 않는다)
+    private static SKCodec? CreateCodec(byte[] source)
     {
-        using var codec = SKCodec.Create(filePath);
+        using var data = SKData.CreateCopy(source);
+        return SKCodec.Create(data);
+    }
+
+    private static SKEncodedOrigin ReadOrientation(byte[] source)
+    {
+        using var codec = CreateCodec(source);
         return codec?.EncodedOrigin ?? SKEncodedOrigin.TopLeft;
     }
 
-    private static SKBitmap LoadAndOrient(string filePath, SKEncodedOrigin origin)
+    private static SKBitmap LoadAndOrient(byte[] source, SKEncodedOrigin origin)
     {
-        var bitmap = SKBitmap.Decode(filePath)
+        var bitmap = SKBitmap.Decode(source)
             ?? throw new InvalidOperationException("이미지를 디코딩할 수 없습니다.");
 
         if (origin == SKEncodedOrigin.TopLeft)
@@ -134,7 +145,7 @@ public static class ImageConversionService
     }
 
     // 썸네일 생성 후 해상도/용량 요약을 반환 (로그 표시용)
-    private static string GenerateThumbnail(string sourcePath, SKEncodedOrigin origin)
+    private static string GenerateThumbnail(string sourcePath, byte[] source, SKEncodedOrigin origin)
     {
         var thumbPath = Path.ChangeExtension(sourcePath, ".thm.jpg");
         if (File.Exists(thumbPath))
@@ -147,7 +158,7 @@ public static class ImageConversionService
             return $"{dims}, {FormatKb(new FileInfo(thumbPath).Length)} (기존)";
         }
 
-        using var original = LoadAndOrient(sourcePath, origin);
+        using var original = LoadAndOrient(source, origin);
 
         var minDim = Math.Min(original.Width, original.Height);
         var cropX = (original.Width - minDim) / 2;
@@ -182,7 +193,7 @@ public static class ImageConversionService
     private const double TargetTolerance = 0.12;  // ±12% 이내면 보정 중단 (소프트 타깃)
 
     private static string GenerateOutput(
-        string sourcePath, int quality, OutputFormat format,
+        string sourcePath, byte[] source, int quality, bool shrinkIfLarger, OutputFormat format,
         SKEncodedOrigin origin, long? targetSizeBytes)
     {
         var ext = format == OutputFormat.Avif ? ".avif.jpg" : ".webp.jpg";
@@ -190,12 +201,14 @@ public static class ImageConversionService
         if (File.Exists(outPath))
             throw new IOException($"파일이 이미 존재합니다: {Path.GetFileName(outPath)}");
 
-        using var original = LoadAndOrient(sourcePath, origin);
+        using var original = LoadAndOrient(source, origin);
         var (bytes, width, height) = EncodeToTarget(original, format, quality, targetSizeBytes);
+        if (shrinkIfLarger)
+            (bytes, quality) = ShrinkBelowSource(original, width, height, format, quality, bytes, source.LongLength);
         File.WriteAllBytes(outPath, bytes);
 
-        // 결과 해상도/용량 요약을 반환 (로그 표시용)
-        return $"{width}×{height}, {FormatKb(bytes.LongLength)}";
+        // 최종 퀄리티/해상도/용량 요약을 반환 (로그 표시용 — 재시도로 낮아진 q는 여기서만 드러난다)
+        return $"q{quality}, {width}×{height}, {FormatKb(bytes.LongLength)}";
     }
 
     // 파일 크기는 해상도로부터 해석적으로 계산 불가 → 인코딩→측정→스케일 보정으로 근접시킨다.
@@ -258,6 +271,36 @@ public static class ImageConversionService
         return (best, bestW, bestH);
     }
 
+    // ── 원본보다 커진 결과 보정 (Auto 퀄리티 전용) ──
+
+    private const int MaxShrinkRetries = 5;   // 재시도 상한 — 넘으면 마지막 결과를 그대로 저장
+    private const int MinShrinkQuality = 1;   // Auto 바닥값(70/55)은 무시하되 0은 피한다 (ImageMagick은 0을 '기본값'으로 해석)
+
+    // 결과가 원본보다 크면 '더 효율적인 압축'이라는 목적에 어긋나므로 퀄리티를 낮춰 재인코딩한다.
+    // 해상도는 그대로 둔다 — 타깃 용량 탐색을 다시 돌리면 해상도가 도로 커져 타깃 부근으로 돌아갈 뿐
+    // 원본보다 작아지지 않는다.
+    private static (byte[] bytes, int quality) ShrinkBelowSource(
+        SKBitmap full, int width, int height, OutputFormat format, int quality, byte[] bytes, long sourceSize)
+    {
+        if (bytes.LongLength <= sourceSize) return (bytes, quality);
+
+        using var resized = width == full.Width && height == full.Height ? null : ResizeTo(full, width, height);
+        var bmp = resized ?? full;
+
+        for (int retry = 0;
+             retry < MaxShrinkRetries && bytes.LongLength > sourceSize && quality > MinShrinkQuality;
+             retry++)
+        {
+            quality = (int)Math.Max(MinShrinkQuality, quality - ShrinkStep(bytes.LongLength, sourceSize));
+            bytes = Encode(bmp, format, quality);
+        }
+        return (bytes, quality);
+    }
+
+    // 초과율을 10% 단위로 올림해 단위당 2씩 (1~10% → 2, 11~20% → 4, 25% → 6). 정수 연산이라 경계값에서 오차 없음
+    private static long ShrinkStep(long size, long sourceSize) =>
+        2 * (((size - sourceSize) * 10 + sourceSize - 1) / sourceSize);
+
     private static byte[] Encode(SKBitmap bmp, OutputFormat format, int quality) =>
         format == OutputFormat.Avif ? EncodeAvif(bmp, quality) : EncodeWebp(bmp, quality);
 
@@ -289,7 +332,11 @@ public static class ImageConversionService
     {
         int w = Math.Max(1, (int)Math.Round(src.Width * scale));
         int h = Math.Max(1, (int)Math.Round(src.Height * scale));
+        return ResizeTo(src, w, h);
+    }
 
+    private static SKBitmap ResizeTo(SKBitmap src, int w, int h)
+    {
         var dst = new SKBitmap(new SKImageInfo(w, h, src.ColorType, src.AlphaType));
         using var canvas = new SKCanvas(dst);
         using var image = SKImage.FromBitmap(src);
