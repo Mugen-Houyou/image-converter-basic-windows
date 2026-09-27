@@ -57,9 +57,7 @@
                                Opacity="{Binding TargetSizeOpacity}" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                    <Button Content="로그 지우기" Padding="8,4" MinWidth="70"
-                            Command="{Binding ClearLogCommand}" />
-                    <Button Content="ℹ" Padding="6,2" MinWidth="30" Margin="6,0,0,0"
+                    <Button Content="ℹ" Padding="6,2" MinWidth="30"
                             FontSize="14" ToolTip="About"
                             Click="AboutButton_Click" />
                 </StackPanel>
@@ -84,26 +82,49 @@
                           DragOver="FileListView_DragOver"
                           DragLeave="FileListView_DragLeave"
                           Drop="FileListView_Drop"
+                          KeyDown="FileListView_KeyDown"
                           ScrollViewer.HorizontalScrollBarVisibility="Disabled"
-                          SelectionMode="Single">
+                          SelectionMode="Extended">
+                    <ListView.ItemContainerStyle>
+                        <Style TargetType="ListViewItem">
+                            <!-- 셀 내용을 열 너비까지 늘려야 '용량' 열의 우측 정렬(TextAlignment)이 적용된다 -->
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                            <!-- 미리보기 툴팁은 행 전체(컨테이너)에 건다. DataContext는 PlacementTarget(=행)의 항목으로 연결 -->
+                            <Setter Property="ToolTipService.InitialShowDelay" Value="300" />
+                            <Setter Property="ToolTipService.BetweenShowDelay" Value="200" />
+                            <Setter Property="ToolTip">
+                                <Setter.Value>
+                                    <ToolTip DataContext="{Binding PlacementTarget.DataContext, RelativeSource={RelativeSource Self}}">
+                                        <StackPanel>
+                                            <Image Source="{Binding FilePath, Converter={StaticResource PathToImage}}"
+                                                   MaxWidth="240" MaxHeight="240"
+                                                   Stretch="Uniform" />
+                                            <TextBlock Text="{Binding PreviewInfoText}" FontSize="11"
+                                                       HorizontalAlignment="Center" Margin="0,4,0,0" />
+                                        </StackPanel>
+                                    </ToolTip>
+                                </Setter.Value>
+                            </Setter>
+                        </Style>
+                    </ListView.ItemContainerStyle>
                     <ListView.View>
                         <GridView>
-                            <GridViewColumn Header="파일명" Width="240">
+                            <GridViewColumn Header="파일명" Width="180">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate DataType="{x:Type models:ImageFileItem}">
-                                        <TextBlock Text="{Binding FileName}"
-                                                   ToolTipService.InitialShowDelay="300"
-                                                   ToolTipService.BetweenShowDelay="200">
-                                            <TextBlock.ToolTip>
-                                                <Image Source="{Binding FilePath, Converter={StaticResource PathToImage}}"
-                                                       MaxWidth="240" MaxHeight="240"
-                                                       Stretch="Uniform" />
-                                            </TextBlock.ToolTip>
-                                        </TextBlock>
+                                        <TextBlock Text="{Binding FileName}" />
                                     </DataTemplate>
                                 </GridViewColumn.CellTemplate>
                             </GridViewColumn>
-                            <GridViewColumn Header="상태" Width="140">
+                            <GridViewColumn Header="용량" Width="66">
+                                <GridViewColumn.CellTemplate>
+                                    <DataTemplate DataType="{x:Type models:ImageFileItem}">
+                                        <TextBlock Text="{Binding FileSizeText}" TextAlignment="Right"
+                                                   Margin="0,0,6,0" />
+                                    </DataTemplate>
+                                </GridViewColumn.CellTemplate>
+                            </GridViewColumn>
+                            <GridViewColumn Header="상태" Width="134">
                                 <GridViewColumn.CellTemplate>
                                     <DataTemplate DataType="{x:Type models:ImageFileItem}">
                                         <StackPanel Orientation="Horizontal">
@@ -149,11 +170,18 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="*" />
                 </Grid.RowDefinitions>
-                <TextBlock Grid.Row="0" Text="로그" FontWeight="Bold"
-                           Margin="4,0,0,4" />
+                <!-- 로그 헤더: 제목 + '로그 지우기' 버튼 (상단바에서 이동) -->
+                <Grid Grid.Row="0" Margin="0,0,0,4">
+                    <TextBlock Text="로그" FontWeight="Bold"
+                               VerticalAlignment="Center" Margin="4,0,0,0" />
+                    <Button Content="로그 지우기" Padding="8,2" MinWidth="70"
+                            HorizontalAlignment="Right" VerticalAlignment="Center"
+                            Command="{Binding ClearLogCommand}" />
+                </Grid>
                 <TextBox Grid.Row="1"
                          Text="{Binding LogText, Mode=OneWay}"
                          IsReadOnly="True"
+                         ScrollViewer.ScrollChanged="LogTextBox_ScrollChanged"
                          VerticalScrollBarVisibility="Auto"
                          HorizontalScrollBarVisibility="Auto"
                          FontFamily="Consolas" FontSize="12"

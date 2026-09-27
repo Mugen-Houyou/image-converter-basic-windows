@@ -56,6 +56,24 @@ public static class ImageConversionService
         return SupportedExtensions.Contains(ext);
     }
 
+    // 목록 추가 시 헤더만 읽어 해상도(EXIF 회전 반영)·포맷을 얻는다. 전체 디코딩 없음. 코덱을 못 만들면 null.
+    // 포맷은 확장자가 아니라 실제 코덱 기준("JPEG", "PNG", ...).
+    public static (int Width, int Height, string Format)? ReadImageInfo(string filePath)
+    {
+        using var codec = SKCodec.Create(filePath);
+        if (codec is null) return null;
+
+        bool swap = SwapsDimensions(codec.EncodedOrigin);
+        int w = swap ? codec.Info.Height : codec.Info.Width;
+        int h = swap ? codec.Info.Width : codec.Info.Height;
+        return (w, h, codec.EncodedFormat.ToString().ToUpperInvariant());
+    }
+
+    // EXIF orientation 중 90°/270° 회전 계열은 가로·세로가 바뀐다. LoadAndOrient와 ReadImageInfo가 공유.
+    private static bool SwapsDimensions(SKEncodedOrigin origin) =>
+        origin is SKEncodedOrigin.LeftTop or SKEncodedOrigin.RightTop
+              or SKEncodedOrigin.RightBottom or SKEncodedOrigin.LeftBottom;
+
     public static int CalculateAutoQuality(byte[] source, OutputFormat format)
     {
         using var codec = CreateCodec(source);
@@ -102,8 +120,7 @@ public static class ImageConversionService
         if (origin == SKEncodedOrigin.TopLeft)
             return bitmap;
 
-        bool swap = origin is SKEncodedOrigin.LeftTop or SKEncodedOrigin.RightTop
-                                 or SKEncodedOrigin.RightBottom or SKEncodedOrigin.LeftBottom;
+        bool swap = SwapsDimensions(origin);
         int w = swap ? bitmap.Height : bitmap.Width;
         int h = swap ? bitmap.Width : bitmap.Height;
 
@@ -155,7 +172,7 @@ public static class ImageConversionService
             var dims = codec is null
                 ? $"{ThumbnailSize}×{ThumbnailSize}"
                 : $"{codec.Info.Width}×{codec.Info.Height}";
-            return $"{dims}, {FormatKb(new FileInfo(thumbPath).Length)} (기존)";
+            return $"{dims}, {FileSize.Format(new FileInfo(thumbPath).Length)} (기존)";
         }
 
         using var original = LoadAndOrient(source, origin);
@@ -183,7 +200,7 @@ public static class ImageConversionService
         using var stream = File.Create(thumbPath);
         data.SaveTo(stream);
 
-        return $"{resized.Width}×{resized.Height}, {FormatKb(data.Size)}";
+        return $"{resized.Width}×{resized.Height}, {FileSize.Format(data.Size)}";
     }
 
     // ── 출력 생성 (타깃 용량 탐색 포함) ──
@@ -208,7 +225,7 @@ public static class ImageConversionService
         File.WriteAllBytes(outPath, bytes);
 
         // 최종 퀄리티/해상도/용량 요약을 반환 (로그 표시용 — 재시도로 낮아진 q는 여기서만 드러난다)
-        return $"q{quality}, {width}×{height}, {FormatKb(bytes.LongLength)}";
+        return $"q{quality}, {width}×{height}, {FileSize.Format(bytes.LongLength)}";
     }
 
     // 파일 크기는 해상도로부터 해석적으로 계산 불가 → 인코딩→측정→스케일 보정으로 근접시킨다.
@@ -346,6 +363,4 @@ public static class ImageConversionService
                                 new SKRect(0, 0, w, h), sampling);
         return dst;
     }
-
-    private static string FormatKb(long bytes) => $"{bytes / 1024.0:F0}KB";
 }

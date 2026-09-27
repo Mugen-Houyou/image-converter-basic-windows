@@ -159,10 +159,16 @@ public class MainViewModel : INotifyPropertyChanged
             if (Files.Any(f => string.Equals(f.FilePath, path, StringComparison.OrdinalIgnoreCase)))
                 continue;
 
+            var info = ImageConversionService.ReadImageInfo(path);
             Files.Add(new ImageFileItem
             {
                 FilePath = path,
                 FileName = Path.GetFileName(path),
+                FileSizeBytes = GetFileSize(path),
+                Width = info?.Width ?? 0,
+                Height = info?.Height ?? 0,
+                // 헤더를 못 읽으면 확장자로 대신 (예: "JPG")
+                Format = info?.Format ?? Path.GetExtension(path).TrimStart('.').ToUpperInvariant(),
                 Status = ConversionStatus.Waiting,
                 StatusText = "대기중"
             });
@@ -173,9 +179,30 @@ public class MainViewModel : INotifyPropertyChanged
             AppendLog($"파일 {added}개 추가됨");
     }
 
-    public void ClearFiles()
+    // 목록 '용량' 열용 원본 크기. 추가 시점에 한 번만 읽고, 못 읽으면 -1(표시 "—").
+    private static long GetFileSize(string path)
     {
-        Files.Clear();
+        try { return new FileInfo(path).Length; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { return -1; }
+    }
+
+    // '목록 지우기'도 RemoveFiles 한 경로를 탄다 — 제거 로그와 변환 중 보호 규칙을 한 곳에서만 관리.
+    public void ClearFiles() => RemoveFiles(Files);
+
+    // 항목 제거의 유일한 경로: 목록 지우기 버튼, Delete 키(macOS ⌘⌫) 모두 여기로 온다.
+    // 변환 중인 항목은 인코딩을 중단할 수 없으므로 남겨 두고,
+    // 대기 중 항목은 제거되면 변환 루프가 건너뛴다(StartConversionAsync 참고).
+    public void RemoveFiles(IEnumerable<ImageFileItem> items)
+    {
+        var removed = 0;
+        foreach (var item in items.ToList())   // SelectedItems 같은 라이브 컬렉션이 와도 안전하게
+        {
+            if (item.Status == ConversionStatus.Processing) continue;
+            if (Files.Remove(item)) removed++;
+        }
+
+        if (removed > 0)
+            AppendLog($"파일 {removed}개 제거됨");
     }
 
     // ── Internal logic ──
@@ -196,6 +223,7 @@ public class MainViewModel : INotifyPropertyChanged
         {
             foreach (var file in Files.Where(f => f.Status == ConversionStatus.Waiting).ToList())
             {
+                if (!Files.Contains(file)) continue;   // 대기 중에 Delete로 제거된 항목은 건너뜀
                 file.Status = ConversionStatus.Processing;
 
                 long? targetBytes = IsTargetSizeEnabled ? TargetSizeKb * 1024L : null;
