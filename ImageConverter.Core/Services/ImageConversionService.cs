@@ -18,8 +18,9 @@ public static class ImageConversionService
     // source: 변환 시작 시 한 번 읽어 둔 원본 바이트. 이후 원본 파일은 다시 열지 않으므로
     //         변환 도중 원본이 옮겨지거나 지워져도 끝까지 진행된다. filePath는 출력 경로 계산에만 쓴다.
     // shrinkIfLarger: 결과가 원본보다 크면 퀄리티를 낮춰 재인코딩 (Auto 퀄리티일 때만 켠다)
+    // autoCorrection: 이미지 내용에 맞춰 퀄리티를 보정하는 정도, 0~1 (Auto 퀄리티일 때만 0보다 크게 준다. 0이면 보정 없음)
     public static Task<(bool success, string error, string note)> ConvertAsync(
-        string filePath, byte[] source, int quality, bool shrinkIfLarger, bool removeExif,
+        string filePath, byte[] source, int quality, bool shrinkIfLarger, double autoCorrection, bool removeExif,
         OutputFormat outputFormat, long? targetSizeBytes = null, CancellationToken ct = default)
     {
         return Task.Run(() =>
@@ -37,7 +38,7 @@ public static class ImageConversionService
 
                 var thumbNote = GenerateThumbnail(filePath, source, thumbnailOrigin);
 
-                var note = GenerateOutput(filePath, source, quality, shrinkIfLarger,
+                var note = GenerateOutput(filePath, source, quality, shrinkIfLarger, autoCorrection,
                                           outputFormat, outputOrigin, targetSizeBytes);
 
                 var formatLabel = outputFormat == OutputFormat.Avif ? "avif" : "webp";
@@ -210,8 +211,8 @@ public static class ImageConversionService
     private const double TargetTolerance = 0.12;  // ±12% 이내면 보정 중단 (소프트 타깃)
 
     private static string GenerateOutput(
-        string sourcePath, byte[] source, int quality, bool shrinkIfLarger, OutputFormat format,
-        SKEncodedOrigin origin, long? targetSizeBytes)
+        string sourcePath, byte[] source, int quality, bool shrinkIfLarger, double autoCorrection,
+        OutputFormat format, SKEncodedOrigin origin, long? targetSizeBytes)
     {
         var ext = format == OutputFormat.Avif ? ".avif.jpg" : ".webp.jpg";
         var outPath = Path.ChangeExtension(sourcePath, ext);
@@ -219,24 +220,36 @@ public static class ImageConversionService
             throw new IOException($"파일이 이미 존재합니다: {Path.GetFileName(outPath)}");
 
         using var original = LoadAndOrient(source, origin);
-        var (bytes, width, height) = EncodeToTarget(original, format, quality, targetSizeBytes);
+        int requestedQuality = quality;
+
+        // 원본 해상도 인코딩은 한 번만 한다 — 그대로 결과가 되거나, 내용 보정의 측정값이 되거나, 타깃 탐색의 출발점이 된다.
+        var bytes = Encode(original, format, quality);
+        int width = original.Width, height = original.Height;
+
+        if (autoCorrection > 0)
+        {
+            // 퀄리티를 올린 결과가 원본보다(타깃 용량이 있으면 그것보다도) 커져서는 안 된다
+            long sizeLimit = Math.Min(source.LongLength, targetSizeBytes ?? long.MaxValue);
+            (bytes, quality) = CorrectForContent(original, format, quality, bytes, autoCorrection, sizeLimit);
+        }
+        if (targetSizeBytes is long target)
+            (bytes, width, height) = EncodeToTarget(original, format, quality, bytes, target);
         if (shrinkIfLarger)
             (bytes, quality) = ShrinkBelowSource(original, width, height, format, quality, bytes, source.LongLength);
         File.WriteAllBytes(outPath, bytes);
 
-        // 최종 퀄리티/해상도/용량 요약을 반환 (로그 표시용 — 재시도로 낮아진 q는 여기서만 드러난다)
-        return $"q{quality}, {width}×{height}, {FileSize.Format(bytes.LongLength)}";
+        // 최종 퀄리티/해상도/용량 요약을 반환 (로그 표시용). 보정이나 재시도로 퀄리티가 바뀌었으면 "q90→95"처럼 처음 값도 보여 준다
+        var qualityNote = quality == requestedQuality ? $"q{quality}" : $"q{requestedQuality}→{quality}";
+        return $"{qualityNote}, {width}×{height}, {FileSize.Format(bytes.LongLength)}";
     }
 
     // 파일 크기는 해상도로부터 해석적으로 계산 불가 → 인코딩→측정→스케일 보정으로 근접시킨다.
     // 퀄리티는 고정하고 해상도만 조정한다. 업스케일은 하지 않으며, 타깃은 소프트(부근이면 OK).
+    // fullBytes: 호출한 쪽이 같은 퀄리티로 이미 해 둔 원본 해상도 인코딩 (탐색의 첫 점)
     private static (byte[] bytes, int width, int height) EncodeToTarget(
-        SKBitmap full, OutputFormat format, int quality, long? targetSizeBytes)
+        SKBitmap full, OutputFormat format, int quality, byte[] fullBytes, long target)
     {
-        if (targetSizeBytes is not long target)
-            return (Encode(full, format, quality), full.Width, full.Height);
-
-        var best = Encode(full, format, quality);
+        var best = fullBytes;
         int bestW = full.Width, bestH = full.Height;
         long size0 = best.LongLength;
 
@@ -286,6 +299,38 @@ public static class ImageConversionService
         }
 
         return (best, bestW, bestH);
+    }
+
+    // ── 이미지 내용에 따른 퀄리티 보정 (Auto 퀄리티 전용) ──
+
+    // Auto 퀄리티는 해상도만 보고 정하므로, 그 퀄리티로 인코딩한 결과(bytes)를 측정값 삼아 이미지 내용에 맞게 고친다.
+    // 잘 압축되는 이미지는 퀄리티를 올리고 아주 복잡한 이미지는 내린다 (규칙과 한계는 AutoQualityCorrection).
+    // 퀄리티가 바뀌면 그 값으로 한 번 더 인코딩하고, 바뀌지 않으면 받은 결과를 그대로 돌려준다.
+    private static (byte[] bytes, int quality) CorrectForContent(
+        SKBitmap full, OutputFormat format, int quality, byte[] bytes, double strength, long sizeLimit)
+    {
+        if (!AutoQualityCorrection.Supports(format)) return (bytes, quality);
+
+        int corrected = AutoQualityCorrection.Correct(
+            quality, (long)full.Width * full.Height, bytes.LongLength, strength, sizeLimit);
+        // 기준이 불투명 이미지로 잰 값이라, 투명 픽셀이 있는 이미지(알파만큼 더 크게 나온다)는 고치지 않는다
+        if (corrected == quality || !IsOpaque(full)) return (bytes, quality);
+
+        var correctedBytes = Encode(full, format, corrected);
+        // 올렸는데 한도를 넘었으면 버린다 — 그대로 두면 뒤에서 퀄리티를 도로 낮추다 처음보다 낮아지거나,
+        // 타깃 용량을 맞추느라 해상도가 줄어든다.
+        if (corrected > quality && correctedBytes.LongLength > sizeLimit) return (bytes, quality);
+
+        return (correctedBytes, corrected);
+    }
+
+    // 투명한 픽셀이 하나도 없는지. EXIF 회전을 구운 비트맵이나 RGBA PNG는 알파 타입만 Premul이고 대개 전부 불투명하다.
+    private static bool IsOpaque(SKBitmap bmp)
+    {
+        if (bmp.AlphaType == SKAlphaType.Opaque) return true;
+
+        using var pixmap = bmp.PeekPixels();
+        return pixmap is not null && pixmap.ComputeIsOpaque();
     }
 
     // ── 원본보다 커진 결과 보정 (Auto 퀄리티 전용) ──

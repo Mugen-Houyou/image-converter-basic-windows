@@ -14,6 +14,7 @@ public class MainViewModel : INotifyPropertyChanged
     private int _webpQuality = 90;
     private double _qualitySliderPosition = QualityCurve.QualityToPosition(90);
     private bool _isWebpQualityAuto = true;
+    private int _autoCorrectionPercent = 100;
     private bool _removeExif = true;
     private bool _isTargetSizeEnabled;
     private int _targetSizeKb = 300;
@@ -89,12 +90,36 @@ public class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged();
             OnPropertyChanged(nameof(QualityText));
             OnPropertyChanged(nameof(SliderOpacity));
+            OnPropertyChanged(nameof(IsAutoCorrectionEnabled));
+            OnPropertyChanged(nameof(AutoCorrectionOpacity));
         }
     }
 
     public double SliderOpacity => IsWebpQualityAuto ? DimmedOpacity : 1.0;
 
     public string QualityText => IsWebpQualityAuto ? "품질: Auto" : $"품질: {WebpQuality}";
+
+    // Auto 퀄리티를 이미지 내용에 맞춰 보정하는 정도(0~100%). 0이면 해상도로 정한 Auto 값을 그대로 쓴다.
+    public int AutoCorrectionPercent
+    {
+        get => _autoCorrectionPercent;
+        set
+        {
+            if (_autoCorrectionPercent == value) return;
+            _autoCorrectionPercent = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(AutoCorrectionText));
+        }
+    }
+
+    public string AutoCorrectionText => $"품질 보정: {AutoCorrectionPercent}%";
+
+    // 보정은 퀄리티가 Auto이고 지원하는 포맷일 때만 동작한다 — 그 밖에는 슬라이더를 끈다
+    public bool IsAutoCorrectionEnabled =>
+        IsWebpQualityAuto && AutoQualityCorrection.Supports(SelectedOutputFormat);
+
+    // 슬라이더는 IsEnabled로 스스로 흐려지므로 라벨만 맞춰 흐리게 한다
+    public double AutoCorrectionOpacity => IsAutoCorrectionEnabled ? 1.0 : DimmedOpacity;
 
     public string[] OutputFormatNames { get; } = { "WEBP", "AVIF" };
 
@@ -134,7 +159,13 @@ public class MainViewModel : INotifyPropertyChanged
     public OutputFormat SelectedOutputFormat
     {
         get => _selectedOutputFormat;
-        set { _selectedOutputFormat = value; OnPropertyChanged(); }
+        set
+        {
+            _selectedOutputFormat = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(IsAutoCorrectionEnabled));
+            OnPropertyChanged(nameof(AutoCorrectionOpacity));
+        }
     }
 
     // ── Commands ──
@@ -241,9 +272,11 @@ public class MainViewModel : INotifyPropertyChanged
 
                     AppendLog($"변환 시작: {file.FileName} (퀄리티 {quality})");
 
-                    // 원본보다 커지면 퀄리티를 낮춰 재시도하는 건 Auto일 때만 — 수동 퀄리티는 사용자 선택을 존중
+                    // 원본보다 커지면 퀄리티를 낮춰 재시도하는 것도, 이미지 내용에 맞춰 퀄리티를 보정하는 것도
+                    // Auto일 때만 — 수동 퀄리티는 사용자 선택을 존중
                     var (success, error, note) = await ImageConversionService.ConvertAsync(
                         file.FilePath, source, quality, shrinkIfLarger: isAuto,
+                        autoCorrection: isAuto ? AutoCorrectionPercent / 100.0 : 0,
                         RemoveExif, SelectedOutputFormat, targetBytes);
 
                     if (success)

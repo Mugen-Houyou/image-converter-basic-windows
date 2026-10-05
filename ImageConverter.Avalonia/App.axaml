@@ -19,6 +19,11 @@
         <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="Transparent" />
         <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="Transparent" />
 
+        <!-- 9x style: Fluent's disabled Slider is #CCCCCC, nearly invisible on the #C0C0C0 toolbar -->
+        <SolidColorBrush x:Key="SliderTrackFillDisabled" Color="#808080" />
+        <SolidColorBrush x:Key="SliderTrackValueFillDisabled" Color="#808080" />
+        <SolidColorBrush x:Key="SliderThumbBackgroundDisabled" Color="#808080" />
+
         <!-- Classic Windows 9x system colors -->
         <SolidColorBrush x:Key="ClassicButtonFace" Color="#C0C0C0" />
         <SolidColorBrush x:Key="ClassicButtonShadow" Color="#808080" />
