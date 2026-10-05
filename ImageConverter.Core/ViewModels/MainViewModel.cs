@@ -99,7 +99,8 @@ public class MainViewModel : INotifyPropertyChanged
 
     public string QualityText => IsWebpQualityAuto ? "품질: Auto" : $"품질: {WebpQuality}";
 
-    // Auto 퀄리티를 이미지 내용에 맞춰 보정하는 정도(0~100%). 0이면 해상도로 정한 Auto 값을 그대로 쓴다.
+    // Auto 퀄리티를 이미지 내용에 맞춰 보정하는 정도(0~200%, 기본 100%). 0이면 해상도로 정한 Auto 값을 그대로 쓰고,
+    // 100%를 넘기면 더 선뜻, 더 멀리 보정한다.
     public int AutoCorrectionPercent
     {
         get => _autoCorrectionPercent;

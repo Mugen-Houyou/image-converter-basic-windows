@@ -18,7 +18,7 @@ public static class ImageConversionService
     // source: 변환 시작 시 한 번 읽어 둔 원본 바이트. 이후 원본 파일은 다시 열지 않으므로
     //         변환 도중 원본이 옮겨지거나 지워져도 끝까지 진행된다. filePath는 출력 경로 계산에만 쓴다.
     // shrinkIfLarger: 결과가 원본보다 크면 퀄리티를 낮춰 재인코딩 (Auto 퀄리티일 때만 켠다)
-    // autoCorrection: 이미지 내용에 맞춰 퀄리티를 보정하는 정도, 0~1 (Auto 퀄리티일 때만 0보다 크게 준다. 0이면 보정 없음)
+    // autoCorrection: 이미지 내용에 맞춰 퀄리티를 보정하는 정도, 0~2 (1이 기본. Auto 퀄리티일 때만 0보다 크게 준다. 0이면 보정 없음)
     public static Task<(bool success, string error, string note)> ConvertAsync(
         string filePath, byte[] source, int quality, bool shrinkIfLarger, double autoCorrection, bool removeExif,
         OutputFormat outputFormat, long? targetSizeBytes = null, CancellationToken ct = default)
@@ -303,6 +303,8 @@ public static class ImageConversionService
 
     // ── 이미지 내용에 따른 퀄리티 보정 (Auto 퀄리티 전용) ──
 
+    private const int MaxFitRetries = 2;   // 올린 결과가 한도를 넘었을 때 다시 맞춰 보는 횟수
+
     // Auto 퀄리티는 해상도만 보고 정하므로, 그 퀄리티로 인코딩한 결과(bytes)를 측정값 삼아 이미지 내용에 맞게 고친다.
     // 잘 압축되는 이미지는 퀄리티를 올리고 아주 복잡한 이미지는 내린다 (규칙과 한계는 AutoQualityCorrection).
     // 퀄리티가 바뀌면 그 값으로 한 번 더 인코딩하고, 바뀌지 않으면 받은 결과를 그대로 돌려준다.
@@ -317,9 +319,19 @@ public static class ImageConversionService
         if (corrected == quality || !IsOpaque(full)) return (bytes, quality);
 
         var correctedBytes = Encode(full, format, corrected);
-        // 올렸는데 한도를 넘었으면 버린다 — 그대로 두면 뒤에서 퀄리티를 도로 낮추다 처음보다 낮아지거나,
+
+        // 올렸더니 예상보다 커서 한도를 넘은 경우: 방금 잰 크기로 한도 안에 드는 퀄리티를 다시 잡는다.
+        // 끝내 못 맞추면 올리지 않는다 — 넘긴 채로 두면 뒤에서 퀄리티를 도로 낮추다 처음보다 낮아지거나,
         // 타깃 용량을 맞추느라 해상도가 줄어든다.
-        if (corrected > quality && correctedBytes.LongLength > sizeLimit) return (bytes, quality);
+        for (int retry = 0; corrected > quality && correctedBytes.LongLength > sizeLimit; retry++)
+        {
+            if (retry == MaxFitRetries) return (bytes, quality);
+
+            corrected = AutoQualityCorrection.FitWithin(
+                quality, bytes.LongLength, corrected, correctedBytes.LongLength, sizeLimit);
+            if (corrected == quality) return (bytes, quality);
+            correctedBytes = Encode(full, format, corrected);
+        }
 
         return (correctedBytes, corrected);
     }

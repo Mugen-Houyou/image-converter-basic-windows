@@ -47,15 +47,17 @@
                         </StackPanel>
                     </Border>
                     <!-- Auto 품질 보정 정도: 품질이 Auto이고 WEBP일 때만 켜진다.
-                         툴팁은 슬라이더가 꺼져 있어도 보이도록 감싸는 패널에 건다 -->
+                         툴팁은 슬라이더가 꺼져 있어도 보이도록 감싸는 패널에 건다.
+                         0~200%이고 기본값 100%가 가운데라, 마우스로도 정확히 놓을 수 있게 5% 단위로 붙인다 -->
                     <StackPanel Orientation="Horizontal" Background="Transparent"
                                 ToolTip="압축이 잘 되는 이미지는 품질을 올리고, 아주 복잡한 이미지는 내립니다 (품질 Auto, WEBP에서만 동작)">
                         <TextBlock Text="{Binding AutoCorrectionText}" VerticalAlignment="Center"
                                    Width="88" TextAlignment="Right" Margin="0,0,6,0"
                                    Opacity="{Binding AutoCorrectionOpacity}" />
-                        <Slider Value="{Binding AutoCorrectionPercent}" Minimum="0" Maximum="100"
+                        <Slider Value="{Binding AutoCorrectionPercent}" Minimum="0" Maximum="200"
                                 Width="100" VerticalAlignment="Center"
-                                SmallChange="1" LargeChange="10"
+                                SmallChange="5" LargeChange="20"
+                                TickFrequency="5" IsSnapToTickEnabled="True"
                                 IsMoveToPointEnabled="True"
                                 IsEnabled="{Binding IsAutoCorrectionEnabled}" />
                     </StackPanel>
